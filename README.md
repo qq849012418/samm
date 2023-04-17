@@ -112,7 +112,26 @@ The source code of the extension is contained in [samm](/samm).
 
 In the GUI of 3D Slicer, expand the extension drop-down menu, and choose `Developer Tools` &rarr; `Extension Wizard`.
 
-Then on the left side of the GUI, click the toggle bar named `Extension Tools` and click `Select Extension' button. It will prompt a navigation window where you can find, select and import the samm folder. 
+Then on the left side of the GUI, click the toggle bar named `Extension Tools` and click `Select Extension`
+button. It will prompt a navigation window where you can find, select and import the samm folder. 
+
+## Contributor
+<p align="center">
+  <a href="https://github.com/bingogome">
+  <img src="https://github.com/bingogome.png" width="60px" alt="Profile Picture" style="border-radius: 50%">
+</a>
+    <a href="https://github.com/jeremyzz830">
+  <img src="https://github.com/jeremyzz830.png" width="60px" alt="Profile Picture" style="border-radius: 50%">
+</a>
+    <a href="https://github.com/shez12">
+  <img src="https://github.com/shez12.png" width="60px" alt="Profile Picture" style="border-radius: 50%">
+</a>
+    <a href="https://github.com/dzenanz">
+  <img src="https://github.com/dzenanz.png" width="60px" alt="Profile Picture" style="border-radius: 50%;">
+</a>  
+  
+</p>
+          
 
 ## Citation 
 If you use SAMM in your research, please consider use the following BibTeX entry.
