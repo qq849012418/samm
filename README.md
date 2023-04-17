@@ -4,7 +4,7 @@
 
 [Laboratory of Biomechanical and Image Guided Surgical Systems](https://bigss.lcsr.jhu.edu/), [Johns Hopkins University](https://www.jhu.edu/)
 
-[Yihao Liu](https://yihao.one/), [Jeremy Zhang](https://jeremyzz830.github.io/), Zhangcong She
+[Yihao Liu](https://yihao.one/), [Jeremy Zhang](https://jeremyzz830.github.io/), [Zhangcong She](https://github.com/shez12)
 
 ## Known issues
 #13 Resolved with a not-so-elegant way. Tested work on MRHead, DZ-MR, MRBrainTumor2 and CTChest data from Slicer. Please report a bug if your data is not working. Note for the first few seconds when you start "Mask Sync", the server is not so stable, wait a few seconds then slide it up and down, the mask then will be updated. Note now you can only work on the RED view. Will update later to support all 3 views.
@@ -117,11 +117,12 @@ Then on the left side of the GUI, click the toggle bar named `Extension Tools` a
 ## Citation 
 If you use SAMM in your research, please consider use the following BibTeX entry.
 
+```bibtex
 @article{liu2023samm,
   title={SAMM (Segment Any Medical Model): A 3D Slicer Integration to SAM},
   author={Liu, Yihao and Zhang, Jiaming and She, Zhangcong and Kheradmand, Amir and Armand, Mehran},
   journal={arXiv preprint arXiv:2304.05622},
   year={2023}
 }
-
+```
 
