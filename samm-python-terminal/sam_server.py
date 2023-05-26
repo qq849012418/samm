@@ -27,6 +27,8 @@ from datetime import datetime
 import traceback
 import logging
 import torch
+import SimpleITK as sitk
+from skimage import transform
 
 class sam_server():
 
@@ -50,12 +52,15 @@ class sam_server():
         self.workspace = workspace
 
         # check if model exists
-        self.sam_checkpoint = self.workspace + "/sam_vit_h_4b8939.pth" 
+        # self.sam_checkpoint = self.workspace + "/sam_vit_h_4b8939.pth"
+        self.sam_checkpoint = self.workspace + "/medsam_20230423_vit_b_0.0.1.pth"
+
         if not os.path.isfile(self.sam_checkpoint):
             raise Exception("SAM model file is not in " + self.sam_checkpoint)
         
         # Load the segmentation model
-        self.model_type = "vit_h"
+        # self.model_type = "vit_h"
+        self.model_type = "vit_b"
         if torch.cuda.is_available():
             self.device = "cuda"
             print("CUDA detected.")
@@ -167,27 +172,65 @@ class sam_server():
         
         self.predictor.features = features
     
-    def predict(self, input_point:np.ndarray, input_label:np.ndarray):
+    def predict(self, input_point:np.ndarray, input_label:np.ndarray, box:np.ndarray, input_mask:np.ndarray):
         self.input_point = input_point
         self.input_label = input_label
         self.masks, self.scores, self.logits = \
             self.predictor.predict( \
                 point_coords=input_point, \
                 point_labels=input_label, \
+                box=box, \
+                mask_input=input_mask, \
                 multimask_output=True )
 
-    def infer_image(self, input_point, input_label, image_name):
+    def infer_image(self, input_point, input_label, input_mask, image_name):
         # input_point = np.array([[200, 100]])
         # input_label = np.array([1])
+        slice_idx = "".join(list(filter(str.isdigit, image_name)))
+        slice_idx = int(slice_idx)
         if len(input_label) != 0:
             self.load_feature(os.path.join(self.workspace, "segmented_images", "segmented_" + image_name + ".pkl"))
-            self.predict(input_point,input_label)
+            ## original:only point
+            # self.predict(input_point,input_label)
+
+            ##  Keenster1:msk
+            # msk_slice_i = input_mask[slice_idx, :, :]
+            # msk_slice_i = transform.resize(msk_slice_i, (256, 256), order=0, preserve_range=True, mode='constant', anti_aliasing=True)
+            # self.predict(None, None, msk_slice_i[None,:,:])
+
+            ## Keenster2:box
+            msk_slice_i = input_mask[slice_idx, :, :]
+            x, y, w, h = cv2.boundingRect(msk_slice_i.astype(np.uint8))
+            bbox=np.array([x, y, x+w, y+h])
+            self.predict(None, None, bbox, None)
+
+            ## Keenster3:box+mask
+            # msk_slice_i = input_mask[slice_idx, :, :]
+            # x, y, w, h = cv2.boundingRect(msk_slice_i.astype(np.uint8))
+            # bbox=np.array([x, y, x+w, y+h])
+            # msk_slice_i = transform.resize(msk_slice_i, (256, 256), order=0, preserve_range=True, mode='constant',
+            #                                anti_aliasing=True)
+            # self.predict(None, None, bbox, msk_slice_i[None,:,:])
         else:
             self.masks = np.full(self.predictor.original_size, False)
         # self.imageshow(self.workspace + "/slices/" + image_name)
-        memmap = np.memmap(os.path.join(self.workspace, "mask.memmap"), dtype='bool', mode='w+', shape=self.masks[0].shape)
-        memmap[:] = self.masks[0][:]
+
+        #Keenster:mask postprocessing
+        outmask=self.masks[0][:].astype(np.uint8)
+        kernel = np.ones((5, 5), np.uint8)  # 设置kenenel大小
+        erosion = cv2.erode(outmask, kernel, iterations=3)  # 腐蚀去除白噪点
+        cv2.imshow("erosion", erosion)
+        dilate = cv2.dilate(erosion, kernel, iterations=3)  # 膨胀还原图形
+        x, y, w, h = cv2.boundingRect(dilate)
+        print(image_name + " x:" + str(x) + " y:" + str(y) + " w:" + str(w) + " h:" + str(h))
+        if w*h<10 or w*h>=512*512/4:
+            print(image_name+" SAM output too small or too large,use matlab prior as final output")
+            dilate=input_mask[slice_idx, :, :].astype(np.uint8)
+        memmap = np.memmap(os.path.join(self.workspace, "mask"+str(slice_idx)+".memmap"), dtype='bool', mode='w+', shape=self.masks[0].shape)
+        # memmap[:] = self.masks[0][:]
+        memmap[:] = dilate
         memmap.flush()
+        return dilate
 
     def imageshow(self, image_path):
         with open(self.imgsize_path, 'r') as file:
@@ -229,8 +272,13 @@ class sam_server():
 
 def main():
 
-    flag_loop = True
+    #Keenster: load mask from matlab
+    print("Loading mask from SSM  ... ")
+    msk_sitk = sitk.ReadImage("D:\\Keenster\\MatlabScripts\\KeensterSSM\\XH_01\\XH_01_erector_spinae_right_SSMpredictfinal.nii.gz")
+    msk_data = sitk.GetArrayFromImage(msk_sitk)
 
+    flag_loop = True
+    first_flag=True
     print("Initializing SAM server  ... ")
     srv = sam_server()
     print("SAM server initialized ... ")
@@ -258,6 +306,22 @@ def main():
                 if srv.flag_loglat:
                     srv.timearr_EMB[0] = datetime.now()
                 srv.computeEmbedding()
+
+                ## Keenster 一次性全部识别
+                if first_flag:
+                    first_flag = False
+                    for i in range(np.size(msk_data,axis=0)):
+                        msk_data[i,:,:]=srv.infer_image( \
+                            np.array([666]), \
+                            np.array([666]),\
+                            msk_data, \
+                            "slc" + str(i))
+                    # 输出
+                    final_sitk=sitk.GetImageFromArray(msk_data)
+                    final_sitk.CopyInformation(msk_sitk)
+                    # 将修改后的图像保存到磁盘
+                    sitk.WriteImage(final_sitk, "D:\\Keenster\\MatlabScripts\\KeensterSSM\\XH_01\\XH_01_erector_spinae_right_SSMSAM"+datetime.now().strftime('%m%d%H%M')+".nii.gz")
+
                 if srv.flag_loglat:
                     srv.timearr_EMB[1] = datetime.now()
                     file_name = srv.workspace + "timearr_EMB.pkl"
@@ -272,7 +336,9 @@ def main():
                 srv.infer_image( \
                     np.array(msg["parameters"]["point"]), \
                     np.array(msg["parameters"]["label"]), \
+                    msk_data,\
                     msg["parameters"]["name"])
+
                 if srv.flag_loglat:
                     srv.timearr_CPL_INF[ctr_CPL_INF] = datetime.now()
                     ctr_CPL_INF = ctr_CPL_INF + 1

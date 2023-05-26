@@ -206,7 +206,7 @@ class SammBaseLogic(ScriptedLoadableModuleLogic):
                 sliceshape = (self._imageSliceNum[1], self._imageSliceNum[2])
             
             if curslc not in self._frozenSlice:
-                memmap = numpy.memmap(self._parameterNode._workspace + '/mask.memmap', \
+                memmap = numpy.memmap(self._parameterNode._workspace + '/mask'+str(curslc)+'.memmap', \
                     dtype='bool', mode='r+', shape=sliceshape) 
                 # assume red TODO (expand to different view)
                 if self._parameterNode.RGYNpArrOrder[0] == 0:
